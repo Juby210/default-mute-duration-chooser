@@ -22,7 +22,7 @@ module.exports = class DefaultMuteDurationChooser extends Plugin {
                     let s = this.settings.get(res.props.channel.id)
                     if (!s) s = this.settings.get('default', { s: -1 })
                     if (s.s == -1) return
-                    mod.updateChannelOverrideSettings(res.props.channel.guild_id, res.props.channel.id, this.getMuteConfig(s.s))
+                    setTimeout(() => mod.updateChannelOverrideSettings(res.props.channel.guild_id, res.props.channel.id, this.getMuteConfig(s.s)), 100)
                 },
                 onContextMenu: e => {
                     contextMenu.openContextMenu(e, () => React.createElement('div', { className: cc.contextMenu },
