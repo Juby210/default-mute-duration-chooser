@@ -1,80 +1,89 @@
 const { Plugin } = require('powercord/entities')
-const { getModule, getModuleByDisplayName, contextMenu, React } = require('powercord/webpack')
+const { findInReactTree } = require('powercord/util')
+const { getAllModules, getModule, getModuleByDisplayName, contextMenu, React } = require('powercord/webpack')
 const { inject, uninject } = require('powercord/injector')
-const { Button, Checkbox } = require('powercord/components/ContextMenu')
+// const ContextMenu = require('powercord/components/ContextMenu')
 
-const Settings = require('./Settings')
+const MenuGroup = require('./components/MuteGroup')
+const Settings = require('./components/Settings')
 
 module.exports = class DefaultMuteDurationChooser extends Plugin {
+    injections = ['dmdc']
+
     async startPlugin() {
         this.registerSettings('dmdc', 'Default Mute Duration Chooser', Settings)
-        const cm = powercord.pluginManager.get('custom-mute')
-        const mod = await getModule(['updateNotificationSettings'])
-        const cc = await getModule(['itemToggle', 'checkbox'])
 
+        const cm = powercord.pluginManager.get('custom-mute') || powercord.pluginManager.get('custom-mute-master')
+        const icm = await getModule(['isMuted'])
+        const mod = await getModule(['updateNotificationSettings'])
+
+        const { MenuItem } = await getModule(['MenuGroup', 'MenuItem'])
         const ChannelMuteButton = await getModuleByDisplayName('FluxContainer(ChannelMuteButton)')
-        const ChannelTimedMuteGroup = await getModule(m => m.default && m.default.displayName == 'ChannelTimedMuteGroup')
+        const channelComponents = await getAllModules(m => m.default && m.default.displayName == 'ChannelListTextChannelContextMenu')
 
         inject('dmdc', ChannelMuteButton.prototype, 'render', (_, res) => {
             if (res.props.isMuted) return res
             return React.createElement('div', {
-                onClick: () => {
+                onClick: async () => {
                     let s = this.settings.get(res.props.channel.id)
                     if (!s) s = this.settings.get('default', { s: -1 })
                     if (s.s == -1) return
-                    setTimeout(() => mod.updateChannelOverrideSettings(res.props.channel.guild_id, res.props.channel.id, this.getMuteConfig(s.s)), 100)
+                    do await new Promise(r => setTimeout(r, 250))
+                    while (!icm.isChannelMuted(res.props.channel.guild_id, res.props.channel.id))
+                    mod.updateChannelOverrideSettings(res.props.channel.guild_id, res.props.channel.id, this.getMuteConfig(s.s))
                 },
                 onContextMenu: e => {
-                    contextMenu.openContextMenu(e, () => React.createElement('div', { className: cc.contextMenu },
-                        React.createElement(ChannelTimedMuteGroup.default, { channel: res.props.channel })))
-                }
+                    contextMenu.openContextMenu(e, () => React.createElement(MenuGroup, res.props))
+                },
+                ...res.props
             }, res)
         })
 
-        inject('dmdc-group', ChannelTimedMuteGroup, 'default', (args, res) => {
-            let save = args[0].__dmdc
-            if (res.props.children.length > 4) res.props.children = [ res.props.children ]
-            if (!save) res.props.children.push(React.createElement(Checkbox, {
-                name: 'Set as default duration',
-                onToggle: () => save = !save
-            }))
-            res.props.children[0].forEach(e => {
-                const { action } = e.props
-                e.props.action = () => {
-                    if (save) this.settings.set(args[0].channel.id, { s: e.key })
-                    if (!args[0].__dmdc) return action()
-                }
-            })
-            if (res.props.children[1] && cm) { // Custom Mute compatibility
-                let h = 0, m = 0, cg = res.props.children[1].props.children
-                if (cg) {
-                    cg[0].props.onValueChange = val => h = Math.round(val)
-                    cg[1].props.onValueChange = val => m = Math.round(val)
-                    cg[2].props.onClick = () => {
-                        if (!h && !m) return
-                        if (save) this.settings.set(args[0].channel.id,
-                            { h, m, s: cm.getMuteConfig(h, m).mute_config.selected_time_window })
-                        if (!args[0].__dmdc)
-                            mod.updateChannelOverrideSettings(args[0].channel.guild_id, args[0].channel.id, cm.getMuteConfig(h, m))
+        channelComponents.forEach((c, i) => {
+            this.injections.push(`dmdc${i}`)
+            inject(`dmdc${i}`, c, 'default', (args, res) => {
+                const submenu = findInReactTree(res, c => c.id == 'mute-channel')
+                if (!submenu) return res
+                let save = args[0].__dmdc, id = args[0].channel.id || args[0].__dmdc
+                // doesn't work
+                // if (!save) submenu.children.push(ContextMenu.renderRawItems([{
+                //     type: 'checkbox',
+                //     name: 'Set as default duration',
+                //     onToggle: () => save = !save
+                // }]))
+                submenu.children.forEach(e => {
+                    if (Array.isArray(e)) return
+                    const { action } = e.props
+                    e.props.action = () => {
+                        if (save) this.settings.set(id, { s: e.key })
+                        if (!args[0].__dmdc) return action()
                     }
+                })
+
+                // Custom Mute compatibility
+                if (cm && findInReactTree(submenu, c => Array.isArray(c) && c.find(e => e.props && e.props.id == 'cmapply'))) {
+                    let i = submenu.children.length - 1, cmgroup = submenu.children[i]
+                    if (!Array.isArray(cmgroup) || !cmgroup.find(e => e.props && e.props.id == 'cmapply'))
+                        i = submenu.children.length - 2
+                    submenu.children[i] = cm.customMuteGroup(args[0].channel.guild_id, id, (h, m) => {
+                        if (save) this.settings.set(id, { h, m, s: cm.getMuteConfig(h, m).mute_config.selected_time_window })
+                    }, !args[0].__dmdc)
                 }
-            }
-            if (args[0].__dmdc && args[0].channel.id != 'default') res.props.children.push(React.createElement(Button, {
-                name: 'Remove',
-                highlight: '#f04747',
-                seperate: true,
-                onClick: () => this.settings.delete(args[0].channel.id)
-            }))
 
-            return res
+                if (args[0].__dmdc && id != 'default') submenu.children.push(React.createElement(MenuItem, {
+                    action: () => this.settings.delete(id),
+                    color: 'colorDanger',
+                    id: 'dmdc-remove',
+                    label: 'Remove'
+                }))
+
+                return res
+            })
+            c.default.displayName = 'ChannelListTextChannelContextMenu'
         })
-        ChannelTimedMuteGroup.default.displayName = 'ChannelTimedMuteGroup'
     }
 
-    pluginWillUnload() {
-        uninject('dmdc')
-        uninject('dmdc-group')
-    }
+    pluginWillUnload = () => this.injections.forEach(i => uninject(i))
 
     getMuteConfig(s) {
         return { muted: true, mute_config: {

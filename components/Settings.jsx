@@ -1,9 +1,11 @@
 const { getModule, React } = require('powercord/webpack')
 const { Category, TextInput } = require('powercord/components/settings')
 
-const { durationMsg, getName } = require('./util')
+const { durationMsg, getName } = require('../util')
 
 const { getChannel } = getModule(['getChannel'], false)
+
+const MuteGroup = require('./MuteGroup')
 
 module.exports = class Settings extends React.Component {
     constructor(props) {
@@ -12,7 +14,6 @@ module.exports = class Settings extends React.Component {
     }
 
     render() {
-        const { default: ChannelTimedMuteGroup } = getModule(m => m.default && m.default.displayName == 'ChannelTimedMuteGroup', false)
         return <>
             <Category
                 name='Default duration'
@@ -20,7 +21,7 @@ module.exports = class Settings extends React.Component {
                 opened={ this.state.default }
                 onChange={ () => this.setState({ default: !this.state.default }) }
             >
-                <ChannelTimedMuteGroup channel={{ id: 'default', getGuildId: () => {} }} __dmdc={ true } />
+                <MuteGroup channel={{ getGuildId: () => {} }} __dmdc={ 'default' } />
             </Category>
             <TextInput
                 style={ this.state.inputerr ? { borderColor: '#f04747' } : {} }
@@ -38,9 +39,9 @@ module.exports = class Settings extends React.Component {
                     opened={ this.state[k] }
                     onChange={ () => this.setState({ [k]: !this.state[k] }) }
                 >
-                    <ChannelTimedMuteGroup channel={{ id: k, getGuildId: () => {} }} __dmdc={ true } />
+                    <MuteGroup channel={{ getGuildId: () => {} }} __dmdc={ k } />
                 </Category> : null
-            ) } 
+            ) }
         </>
     }
 }
