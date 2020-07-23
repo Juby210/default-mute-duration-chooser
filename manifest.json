@@ -2,6 +2,6 @@
     "name": "Default Mute Duration Chooser",
     "description": "Adds a settings page where you can specify default applied amount of time when clicked on mute button. Also adds context menu to mute button. Compatible with Custom Mute.",
     "author": "Juby210#0577",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "license": "MIT"
 }

@@ -15,7 +15,7 @@ module.exports = class DefaultMuteDurationChooser extends Plugin {
 
         const cm = powercord.pluginManager.get('custom-mute') || powercord.pluginManager.get('custom-mute-master')
         const icm = await getModule(['isMuted'])
-        const mod = await getModule(['updateNotificationSettings'])
+        const mod = await getModule(['updateChannelOverrideSettings'])
 
         const { MenuItem } = await getModule(['MenuGroup', 'MenuItem'])
         const ChannelMuteButton = await getModuleByDisplayName('FluxContainer(ChannelMuteButton)')

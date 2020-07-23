@@ -1,11 +1,10 @@
 const { getModule, React } = require('powercord/webpack')
 const { Category, TextInput } = require('powercord/components/settings')
 
+const MuteGroup = require('./MuteGroup')
 const { durationMsg, getName } = require('../util')
 
 const { getChannel } = getModule(['getChannel'], false)
-
-const MuteGroup = require('./MuteGroup')
 
 module.exports = class Settings extends React.Component {
     constructor(props) {
@@ -21,7 +20,7 @@ module.exports = class Settings extends React.Component {
                 opened={ this.state.default }
                 onChange={ () => this.setState({ default: !this.state.default }) }
             >
-                <MuteGroup channel={{ getGuildId: () => {} }} __dmdc={ 'default' } />
+                <MuteGroup channel={{ getGuildId: () => {} }} __dmdc='default' />
             </Category>
             <TextInput
                 style={ this.state.inputerr ? { borderColor: '#f04747' } : {} }
